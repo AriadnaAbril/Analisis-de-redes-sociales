@@ -1,0 +1,1429 @@
+---
+title: "Taller 5"
+author: "Ariadna Sofía Contreras Abril, Angie Catalina Villate"
+date: "19/10/2022"
+output: html_document
+---
+
+```{r}
+suppressMessages(suppressWarnings(library(readr)))
+suppressMessages(suppressWarnings(library(tidyverse)))
+suppressMessages(suppressWarnings(library(tidytext)))
+suppressMessages(suppressWarnings(library(magrittr)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+suppressMessages(suppressWarnings(library(dplyr)))
+suppressMessages(suppressWarnings(library(wordcloud)))
+suppressMessages(suppressWarnings(library(RColorBrewer)))
+suppressMessages(suppressWarnings(library(reshape2)))
+suppressMessages(suppressWarnings(library(igraph)))
+suppressMessages(suppressWarnings(library(ngram)))
+```
+
+## 1 Importación de los discursos
+
+Se importan los discursos txt, asegurándose de trabajar con formato UTF-8 y que cada línea se tome como un individuo  
+```{r, warning=FALSE}
+text_obama <- read_csv("Discurso_Obama.txt", col_names = FALSE, show_col_types = FALSE)
+text_trump <- read_csv("Discurso_Trump.txt", col_names = FALSE, show_col_types = FALSE)
+text_bush <- read_csv("discurso_bush.txt", col_names = FALSE, show_col_types = FALSE)
+text_biden <- read_csv("Discurso_Biden.txt", col_names = FALSE, show_col_types = FALSE)
+```
+Ahora se concatenan los data frame creados para obtener una lista con cada línea como un objeto y posteriormente se vuelve cada lista un vector eliminando los nombres de estos vectores
+```{r}
+text_obama <- unlist(c(text_obama))
+text_trump <- unlist(c(text_trump))
+text_bush <- unlist(c(text_bush))
+text_biden <- unlist(c(text_biden))
+
+names(text_obama) <- names(text_trump) <- names(text_bush) <- names(text_biden) <- NULL
+```
+
+```{r}
+#-------------------------------------------------------------------------------------------------- Bush
+rbind(head(text_bush, n = 3), tail(text_bush, n = 3))
+```
+```{r}
+#-------------------------------------------------------------------------------------------------- Obama
+rbind(head(text_obama, n = 3), tail(text_obama, n = 3))
+```
+```{r}
+#-------------------------------------------------------------------------------------------------- Trump
+rbind(head(text_trump, n = 3), tail(text_trump, n = 3))
+```
+```{r}
+#-------------------------------------------------------------------------------------------------- Biden
+rbind(head(text_biden, n = 3), tail(text_biden, n = 3))
+```
+Se crea un objeto tibble en donde se indique el número de cada línea de los discursos
+
+```{r}
+# tibble en lugar de data_frame
+text_bush_st <- tibble(line = 1:length(text_bush), text = text_bush)
+text_obama_st <- tibble(line = 1:length(text_obama), text = text_obama)  
+text_trump_st <- tibble(line = 1:length(text_trump), text = text_trump)
+text_biden_st <- tibble(line = 1:length(text_biden), text = text_biden)
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------- Bush
+rbind(head(text_bush_st, n = 3), tail(text_bush_st, n = 3))
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------- Obama
+rbind(head(text_obama_st, n = 3), tail(text_obama_st, n = 3))
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------- Trump
+rbind(head(text_trump_st, n = 3), tail(text_trump_st, n = 3))
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------- Biden
+rbind(head(text_biden_st, n = 3), tail(text_biden_st, n = 3))
+```
+
+## 2 Tokenización
+
+Se tokeniza cada línea de los discursos para poder obtener datos estructurados, es decir, que cada palabra sea una unidad de análisis
+
+```{r}
+# se tokeniza cada línea del discurso
+
+#------------------------------------------------------------------------------------------------------------------------ Bush
+text_bush <- text_bush_st %>%
+  unnest_tokens(input = text, output = word) %>%
+  filter(!is.na(word))
+
+dim(text_bush)
+
+rbind(head(text_bush, n = 5), tail(text_bush, n = 5))
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------------- Obama
+text_obama <- text_obama_st %>%
+  unnest_tokens(input = text, output = word) %>%
+  filter(!is.na(word))
+
+dim(text_obama)
+
+rbind(head(text_obama, n = 5), tail(text_obama, n = 5))
+```
+
+```{r}
+#--------------------------------------------------------------------------------------------------------------- Trump
+text_trump <- text_trump_st %>%
+  unnest_tokens(input = text, output = word) %>%
+  filter(!is.na(word))
+
+dim(text_trump)
+
+rbind(head(text_trump, n = 5), tail(text_trump, n = 5))
+```
+
+```{r}
+#----------------------------------------------------------------------------------------------------------- Biden
+text_biden <- text_biden_st %>%
+  unnest_tokens(input = text, output = word) %>%
+  filter(!is.na(word))
+
+dim(text_biden)
+
+rbind(head(text_biden, n = 5), tail(text_trump, n = 5))
+```
+
+Como se puede observar la tokenización elimina signos de puntuación y convierte todas las palabras a minúsculas.
+
+## 3 Normalización del texto
+
+### 3.1 Eliminar números  
+
+Debido a que en los discursos no hay ningún símbolo especial ni acentos por estar en inglés, se procede a ver si hay números
+```{r}
+#Ver si hay números en los discursos
+
+#--------------------------------------------------------------------------------------------------- Bush
+text_bush %>%
+  filter(grepl(pattern = '[0-9]', x = word)) %>% 
+  count(word, sort = TRUE)
+```
+
+Encontramos que solo hay un número en los discursos de Bush, el cual hace referencia a una temporalidad, y debido a que solo aparece una vez en el discurso de Bush no se considera relevante.
+
+```{r}
+#------------------------------------------------------------------------------------------------------- Obama
+text_obama %>%
+  filter(grepl(pattern = '[0-9]', x = word)) %>% 
+  count(word, sort = TRUE)
+```
+
+De los números que se encuentran en el discruso de Obama ninguno es relevante para el análisis del discurso, 1776 es el año en el que llegaron los padres fundadores y se da a entender en el contexto de la línea, mientras que los números 40, 400 y 60 son solo años que se refieren al futuro y pasado. Además al repetirse cada número una sola vez se confirma que no son muy relevantes en el texto.
+
+```{r}
+#------------------------------------------------------------------------------------------------------ Trump
+text_trump %>%
+  filter(grepl(pattern = '[0-9]', x = word)) %>% 
+  count(word, sort = TRUE)
+```
+De los números encontrados en el discruso de Trump, ambos números se refieren al día y año de la posesión del presidente Trump, sin embargo como solo se nombran una vez en todo el texto no se considera relevante para el análisis.
+
+```{r}
+#------------------------------------------------------------------------------------------------ Biden
+text_biden %>%
+  filter(grepl(pattern = '[0-9]', x = word)) %>% 
+  count(word, sort = TRUE)
+```
+En cuanto a los números encontrados en el discurso de Biden, hacen referencia a fechas o referencias temporales, además de una mención a las victimas mortales de la pandemia.
+
+```{r}
+# Eliminar números de los discursos
+
+#----------------------------------------------------------------------------------------------------------------- Bush
+text_bush %<>%
+  filter(!grepl(pattern = '[0-9]', x = word))
+dim(text_bush)
+
+#------------------------------------------------------------------------------------------------------------------ Obama
+text_obama %<>%
+  filter(!grepl(pattern = '[0-9]', x = word))
+dim(text_obama)
+
+#------------------------------------------------------------------------------------------------------------------ Trump
+text_trump %<>%
+  filter(!grepl(pattern = '[0-9]', x = word))
+dim(text_trump)
+
+#------------------------------------------------------------------------------------------------------------------ Biden
+text_biden %<>%
+  filter(!grepl(pattern = '[0-9]', x = word))
+dim(text_biden)
+```
+```{r}
+##### Frecuencia de los tokens 
+cbind(
+text_bush %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Bush=word, n_Bush=n) %>%
+  head(n = 10),
+
+text_obama %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Obama=word, n_Obama=n) %>%
+  head(n = 10),
+
+text_trump %>% 
+  count(word, sort = TRUE) %>%
+  rename(word_Trump=word, n_Trump=n) %>%
+  head(n = 10),
+
+text_biden %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Biden=word, n_Biden=n) %>%
+  head(n = 10)
+)
+```
+
+Como se puede ver en los cuatro discursos las palabras con mayor frecuencia son aquellas que no tienen ningún peso en el análisis, también llamadas stop words, por lo que se eliminan de los discursos.
+
+### 3.2 Stop words  
+
+Ahora se ven las stop words a utilizar
+
+```{r}
+data(stop_words)
+dim(stop_words)
+table(stop_words$lexicon)
+```
+
+Se utilizan los tres diccionarios que vienen con la librería tidytext, onix, SMART y snowball, donde cada uno tiene 404, 571 y 174 palabras respectivamente.
+
+Ahora se remueven las palabras de los diccionarios mencionados anteriormente de los discuros 
+
+```{r include=FALSE}
+##### remover stop words
+# ---------------------------------------------------------------- Bush
+text_bush %<>% 
+  anti_join(x = ., y = stop_words)
+
+# ---------------------------------------------------------------- Obama 
+text_obama %<>% 
+  anti_join(x = ., y = stop_words)
+
+# ---------------------------------------------------------------- Trump
+text_trump %<>% 
+  anti_join(x = ., y = stop_words)
+
+# ---------------------------------------------------------------- Biden
+text_biden %<>% 
+  anti_join(x = ., y = stop_words)
+```
+
+```{r}
+##### número de tokens por presidente 
+data.frame("Presidente"=c("Bush", "Obama", "Trump", "Biden"), "Num_tokens"=c(dim(text_bush)[1], dim(text_obama)[1], dim(text_trump)[1], dim(text_biden)[1]))
+```
+Se eliminaron 2229 palabras de los discursos de Bush, 2792 palabras de los discursos de Obama, 917 del discurso de Trump y 1560 del discurso de Biden.
+
+Ahora se ve la frecuencia de los tokens de cada discurso
+
+```{r}
+##### Frecuencia de los tokens por discurso
+cbind(
+text_bush %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Bush=word, n_Bush=n) %>%
+  head(n = 10),
+
+text_obama %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Obama=word, n_Obama=n) %>%
+  head(n = 10),
+
+text_trump %>% 
+  count(word, sort = TRUE) %>%
+  rename(word_Trump=word, n_Trump=n) %>%
+  head(n = 10),
+
+text_biden %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Biden=word, n_Biden=n) %>%
+  head(n = 10)
+)
+```
+
+Como se puede observar hay palabras con el mismo sufijo o que se pueden considerar como sinónimos, por lo tanto para un mejor análisis esas palabras se agrupan en una sola.
+
+### 3.3 Sufijos o sinónimos
+
+```{r}
+#------------------------------------------------------------------------------------------------------------ Bush
+text_bush%<>%
+  mutate(word=case_when(word=="country"~"america",
+                        word=="america's"~"america",
+                        word=="nation"~"america",
+                        word=="american"~"americans",
+                        word=="citizens"~"americans",
+                        word=="liberty"~"freedom",
+                        TRUE~word))
+
+#------------------------------------------------------------------------------------------------------------ Obama
+text_obama%<>%
+  mutate(word=case_when(word=="country"~"america",
+                        word=="nation"~"america",
+                        word=="american"~"americans",
+                        word=="citizens"~"americans",
+                        word=="liberty"~"freedom",
+                        TRUE~word))
+
+#------------------------------------------------------------------------------------------------------------ Trump
+text_trump%<>%
+  mutate(word=case_when(word=="country"~"america",
+                        word=="nation"~"america",
+                        word=="american"~"americans",
+                        word=="citizens"~"americans",
+                        TRUE~word))
+
+#------------------------------------------------------------------------------------------------------------ Biden
+text_biden%<>%
+  mutate(word=case_when(word=="country"~"america",
+                        word=="nation"~"america",
+                        word=="american"~"americans",
+                        word=="citizens"~"americans",
+                        word=="liberty"~"freedom",
+                        TRUE~word))
+
+```
+
+   
+```{r}
+##### Frecuencia de los tokens por discurso
+cbind(
+  #----------------------------------------------------------------------------------------------------- Bush
+text_bush %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Bush=word, n_Bush=n) %>%
+  head(n = 30),
+
+#----------------------------------------------------------------------------------------------------- Obama
+text_obama %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Obama=word, n_Obama=n) %>%
+  head(n = 30),
+
+#----------------------------------------------------------------------------------------------------- Trump
+text_trump %>% 
+  count(word, sort = TRUE) %>%
+  rename(word_Trump=word, n_Trump=n) %>%
+  head(n = 30),
+
+#----------------------------------------------------------------------------------------------------- Biden
+text_biden %>% 
+  count(word, sort = TRUE)%>%
+  rename(word_Biden=word, n_Biden=n) %>%
+  head(n = 30)
+)
+
+```
+
+## 4 Visualizaciones
+
+```{r}
+#------------------------------------------------------------------------------------------------ Bush
+text_bush %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 6) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+    theme_light() + 
+    geom_col(fill = 'firebrick2', alpha = 0.8) +
+    xlab(NULL) +
+    ylab("Frecuencia") +
+    coord_flip() +
+    ggtitle(label = 'Bush: Conteo de palabras') -> p1
+
+#------------------------------------------------------------------------------------------------- Obama
+text_obama %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 6) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+    theme_light() + 
+    geom_col(fill = 'dodgerblue4', alpha = 0.8) +
+    xlab(NULL) +
+    ylab("Frecuencia") +
+    coord_flip() +
+    ggtitle(label = 'Obama: Conteo de palabras') -> p2
+
+# ------------------------------------------------------------------------------------------------ Trump
+text_trump %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 3) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+    theme_light() + 
+    geom_col(fill = 'firebrick2', alpha = 0.8) +
+    xlab(NULL) +
+    ylab("Frecuencia") +
+    coord_flip() +
+    ggtitle(label = 'Trump: Conteo de palabras') -> p3
+
+#------------------------------------------------------------------------------------------------- Biden
+text_biden %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 4) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+    theme_light() + 
+    geom_col(fill = 'dodgerblue4', alpha = 0.8) +
+    xlab(NULL) +
+    ylab("Frecuencia") +
+    coord_flip() +
+    ggtitle(label = 'Biden: Conteo de palabras') -> p4
+
+grid.arrange(p1, p3, ncol = 2)
+grid.arrange(p2, p4, ncol = 2)
+
+```
+
+Como se puede ver de los gráficos de barras, en todos los discursos se tienen varias palabras en común, siendo las principales, america y americans. Lo cual indica que los discursos se centran más en el país y sus ciudadanos, encontramos otras palabras comunes como people o world, sin embargo el resto de palabras parecen diferir un poco. Esto debido a que las palabras de los discursos de Bush estan encaminadas a la justicia y a temas relacionados con contextos historicos, por otro lado, las de Obama parecen estar más encaminadas hacia la libertad, paz e igualdad en esa generación, el discurso de Trump indica que trata más sobre proteger el sueño americano, el poder y la riqueza. Finalmente, Biden parece mostrarse mas neutral a pesar de tener war entre sus palabras principales,esto debido a que otras palabras no son solo enfocadas en el patriotismo estadounidense y pueden verse entre las principales de su discurso. Esto mismo se puede observar en las siguientes nubes de palabras.
+
+```{r, warning=FALSE}
+par(mfrow = c(2,2), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# ---------------------------------------------------------------------------------------------- Bush
+set.seed(123)
+text_bush%>%
+  count(word, sort = TRUE) %>%
+  with(wordcloud(words = word, freq = n, max.words = 20, colors = 'firebrick2'))
+title(main = "Bush")
+
+# ----------------------------------------------------------------------------------------------- Obama
+set.seed(12)
+text_obama %>%
+  count(word, sort = TRUE) %>%
+  with(wordcloud(words = word, freq = n, max.words = 20, colors = 'dodgerblue4'))
+title(main = "Obama")
+
+# ----------------------------------------------------------------------------------------------- Trump
+set.seed(123)
+text_trump %>%
+  count(word, sort = TRUE) %>%
+  with(wordcloud(words = word, freq = n, max.words = 20, colors = 'firebrick2'))
+title(main = "Trump")
+
+# ------------------------------------------------------------------------------------------------ Biden
+set.seed(12)
+text_biden %>%
+  count(word, sort = TRUE) %>%
+  with(wordcloud(words = word, freq = n, max.words = 20, colors = 'dodgerblue4'))
+title(main = "Biden")
+```
+
+## 5 Frecuencias y correlaciones 
+
+### 5.1 Frecuencias de palabras en cada discurso
+
+```{r}
+##### frecuencias relativas de la palabras
+frec<-bind_rows(mutate(.data = text_bush, author = "Bush"),
+                mutate(.data = text_obama, author = "Obama"),
+                mutate(.data = text_trump, author = "Trump"),
+                mutate(.data = text_biden, author = "Biden")) %>%
+  count(author, word) %>%
+  group_by(author) %>%
+  mutate(proportion = n/sum(n)) %>%
+  select(-n) %>%
+  spread(author, proportion, fill = 0) %>%
+  select(word, Bush, Obama, Trump, Biden)
+
+# total de tokens entre los discursos de los 4 ex-presidentes
+dim(frec)
+```
+Uniendo los tokens de los discursos de los cuatro ex-presidentes, se ve que hay 1930 palabras entre los discursos
+
+```{r}
+head(frec, n = 10)
+```
+
+Ahora se analizarán las palabras que tuvieron en común los presidentes por partido, republicano y demócrata.
+
+```{r}
+# --------------------------------------------------------------------------------------------------- Republicanos
+frec_comun_repu<-frec %>%
+  filter(Bush !=0, Trump != 0) %>%
+  arrange(desc(Bush), desc(Trump)) %>% select(word, Bush, Trump)
+
+dim(frec_comun_repu)
+
+###### proporción de palabras en común
+dim(frec_comun_repu)[1]/dim(frec)[1]
+```
+
+De las 1930 palabras solo 126 se usaron en ambos discursos de los presidentes republicanos, es decir los discursos de Bush y Trump comparten el $6.53\%$ del total de palabras encontradas en los cuatro discursos.  
+
+```{r}
+head(frec_comun_repu, n = 10)
+```
+
+
+```{r}
+# --------------------------------------------------------------------------------------------- Demócratas
+frec_comun_dem<-frec %>%
+  filter(Obama !=0, Biden != 0) %>%
+  arrange(desc(Obama), desc(Biden)) %>% select(word, Obama, Biden)
+
+dim(frec_comun_dem)
+
+###### proporción de palabras en común
+dim(frec_comun_dem)[1]/dim(frec)[1]
+```
+
+De las 1930 palabras solo 216 se usaron en ambos discursos de los presidentes demócratas, es decir los discursos de Obama y Biden comparten el $11.19\%$ del total de palabras encontradas en los cuatro discursos.  
+
+```{r}
+head(frec_comun_dem, n = 10)
+```
+
+A continuación se analizan las palabras que tuvieron en común los discursos demócratas con los republicanos.
+
+```{r}
+##### frecuencias relativas de la palabras por partido
+frec_part<- frec %>% 
+            mutate(democratas= Obama+Biden, republicanos = Bush+Trump) %>%
+            filter(democratas !=0, republicanos!= 0) %>%
+            arrange(desc(democratas), desc(republicanos)) %>%
+            select(word, democratas, republicanos)
+
+dim(frec_part)
+
+###### proporción de palabras en común entre partidos
+dim(frec_part)[1]/dim(frec)[1]
+```
+
+Entre los discursos demócratas y republicanos se comparten 477 palabras, de las 1930 de la totalidad de los discursos trabajados, esto equivale al  $24.72\%$ del total de palabras encontradas en los cuatro discursos.
+
+```{r}
+head(frec_part, n = 10)
+```
+
+
+### 5.2 Correlación entre las frecuencias de las palabras de los discursos
+
+```{r, warning=FALSE}
+suppressMessages(suppressWarnings(library(car)))
+
+##### Pruebas de normalidad de las frecuencias
+Normalidad <- c(shapiro.test(frec$Bush)$p.value,
+shapiro.test(frec$Obama)$p.value,
+shapiro.test(frec$Trump)$p.value,
+shapiro.test(frec$Biden)$p.value)
+
+names(Normalidad) <- c("Bush", "Obama", "Trump", "Biden")
+
+Normalidad
+
+##### al no haber normalidad en las frecuencias relativas de ningún discruso se usa la prueba de Levene para ver si hay homocedasticidad
+PV<-matrix(NA, 4, 4)
+
+PV[1,2]<- (leveneTest(c(frec$Bush[frec$Bush!=0], frec$Obama[frec$Obama!=0]),
+           c(rep("Bush",809),rep("Obama",1066)))$`Pr(>F)`)[1]
+PV[1,3]<-(leveneTest(c(frec$Bush[frec$Bush!=0], frec$Trump[frec$Trump!=0]),
+           c(rep("Bush",809),rep("Trump",365)))$`Pr(>F)`)[1]
+PV[1,4]<-(leveneTest(c(frec$Bush[frec$Bush!=0], frec$Biden[frec$Biden!=0]),
+           c(rep("Bush",809),rep("Biden",509)))$`Pr(>F)`)[1]
+PV[2,3]<-(leveneTest(c(frec$Obama[frec$Obama!=0], frec$Trump[frec$Trump!=0]),
+           c(rep("Obama",1066),rep("Trump",365)))$`Pr(>F)`)[1]
+PV[2,4]<-(leveneTest(c(frec$Obama[frec$Obama!=0], frec$Biden[frec$Biden!=0]),
+           c(rep("Obama",1066),rep("Biden",509)))$`Pr(>F)`)[1]
+PV[3,4]<-(leveneTest(c(frec$Trump[frec$Trump!=0], frec$Biden[frec$Biden!=0]),
+           c(rep("Trump",365),rep("Biden",509)))$`Pr(>F)`)[1]
+
+colnames(PV)<-rownames(PV)<- c("Bush", "Obama", "Trump", "Biden")
+
+round(PV,4)
+
+```
+
+Debido a que no hay normalidad en las frecuencias de ningún candidato, como se puede observar en el vecor con los p-valores de la prueba de Shapiro para cada presidente, y hay homocedasticidad solo entre Bush y Trump, Bush y Biden y entre Trump y Biden, supuestos que son necesarios para realizar el coeficiente de correlación de Pearson. Se calculan los coeficientes de correlación solo entre los presidentes que presentaron homocedasticidad, vale aclarar que estos valores no van a ser confiables para hacer conclusiones, sin embargo pueden considerarse como ideas preliminares para el análisis.
+
+```{r}
+##### número de palabras en común
+com_BB <- dim(frec %>%
+  filter(Bush !=0, Biden != 0) %>% 
+  select(word, Bush, Biden))[1]
+
+com_TB <- dim(frec %>%
+  filter(Trump !=0, Biden != 0) %>% 
+  select(word, Trump, Biden))[1]
+
+##### correlacion de las frecuencias
+Corr<-matrix(NA, 3, 3)
+
+Corr[1,2]<-cor.test(x = c(frec$Bush[frec$Bush!=0], rep(0, 239)), y = c(frec$Trump[frec$Trump!=0], rep(0, 683)))$estimate
+Corr[1,3]<-cor.test(x = c(frec$Bush[frec$Bush!=0], rep(0, 509-com_BB)), y = c(frec$Biden[frec$Biden!=0], rep(0, 809-com_BB)))$estimate
+Corr[2,3]<-cor.test(x = c(frec$Trump[frec$Trump!=0], rep(0, 509-com_TB)), y = c(frec$Biden[frec$Biden!=0],                 
+                                                                                rep(0,365-com_TB)))$estimate
+
+rownames(Corr) <- colnames(Corr) <- c("Bush", "Trump", "Biden")
+
+round(Corr,3)
+
+```
+
+Las correlaciones calculadas podrían indicar que entre las frecuencias de las palabras de los discursos de los presidentes mencionados, parece no haber correlación lineal.
+
+## 6 Análisis de sentimiento
+
+Primero se escoge el diccionario a utilizar en el análisis de sentimientos 
+
+```{r, warning=FALSE, include=FALSE}
+# Finn Arup Nielsen, escala de -5 a 5.
+AFINN <- read_table2("AFINN-111.txt", col_names = c("word", "score")) %>% 
+  mutate(sentiment=case_when(score < 0 ~ "negative",
+                             score > 0 ~ "positive",
+                             score == 0 ~ "0"))
+
+# aif Mohammad and Peter Turney, clasificacion binaria (+/-) y algunas categorias
+negative_NRC <- read_table2("NRC-Emotion-Lexicon/OneFilePerEmotion/negative-NRC-Emotion-Lexicon.txt", col_names = c("word0", "punt")) %>% 
+  mutate(sentiment0=case_when(punt==1 ~ "negative",
+                             punt==0 ~ "positive")) %>%
+  select(word0, sentiment0)
+
+positive_NRC <- read_table2("NRC-Emotion-Lexicon/OneFilePerEmotion/positive-NRC-Emotion-Lexicon.txt", col_names = c("word1", "punt")) %>% 
+  mutate(sentiment1=case_when(punt==1 ~ "positive",
+                             punt==0 ~ "negative")) %>%
+  select(word1, sentiment1)
+
+
+NRC <- negative_NRC %>% full_join(positive_NRC, by=c("word0"="word1", "sentiment0"="sentiment1")) %>%
+  group_by(word0) %>%
+  mutate(rep=n(), sentiment=sentiment0, word=word0) %>%
+  select(word, sentiment)
+```
+
+```{r}
+table(AFINN$sentiment)
+table(sentiments$sentiment)
+table(NRC$sentiment)
+```
+
+Debido a que el diccionario NRC es el que tiene una mayor cantidad de palabras tanto positivas como negativas, es con este diccionario con el que se realiza el siguiente análisis
+
+```{r}
+#-------------------------------------------------------------------- Bush
+text_bush %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  filter(n > 6) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+    geom_col() +
+    scale_fill_manual(values = c("firebrick4", "firebrick2")) +
+    coord_flip(ylim = c(-7,7)) +
+    labs(y = "Frecuencia",
+         x = NULL,
+         title = "Bush: Conteo por NRC") +
+    theme_minimal() -> p1
+
+#-------------------------------------------------------------------- Obama
+text_obama %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  filter(n > 6) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+    geom_col() +
+    scale_fill_manual(values = c("dodgerblue4", "deepskyblue")) +
+    coord_flip(ylim = c(-7,7)) +
+    labs(y = "Frecuencia",
+         x = NULL,
+         title = "Obama: Conteo por NRC") +
+    theme_minimal() -> p2
+
+#-------------------------------------------------------------------- Trump
+text_trump %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  filter(n > 3) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+    geom_col() +
+    scale_fill_manual(values = c("firebrick4", "firebrick2")) +
+    coord_flip(ylim = c(-7,7)) +
+    labs(y = "Frecuencia",
+         x = NULL,
+         title = "Trump: Conteo por sentiment") +
+    theme_minimal() -> p3 
+
+#-------------------------------------------------------------------- Biden
+text_biden %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  filter(n > 5) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+    geom_col() +
+    scale_fill_manual(values = c("dodgerblue4", "deepskyblue")) +
+    coord_flip(ylim = c(-7,7)) +
+    labs(y = "Frecuencia",
+         x = NULL,
+         title = "Biden: Conteo por NRC") +
+    theme_minimal() -> p4
+
+grid.arrange(p1, p3, ncol = 2)
+grid.arrange(p2, p4, ncol = 2)
+```
+
+En los gráficos de barras las palabras con frecuencias tanto positivas como negativas se consideran como palabras neutras.De las principales palabras en cada discurso, se observa que Bush y Obama son los presidentes con mayor número de palabras tanto positivas como negativas en sus discursos, esto se puede deber al hecho de que rigieron durante dos periodos presidenciales cada uno, por lo tanto, se tomaron sus dos discursos como uno solo, lo cual implica que se tienen mayor cantidad de palabras para analizar. Además, un aspecto a resaltar es el hecho de que palabras del mismo contexto como lo son government y president tienen asociados sentimientos opuestos. 
+
+Por otro lado, se observa que los discursos entre presidentes del mismo partido no parecen seguir una misma temática a pesar de tener ideales políticos similares.
+
+Estas mismas clasificaciones se pueden ver en las siguientes nubes de palabras, donde solo se muestran las palabras con sentimientos bien definidos, es decir aquellas que no son neutras.
+
+
+```{r, warning=FALSE}
+
+par(mfrow = c(1,2), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# ------------------------------------------------------------------------------ Bush
+set.seed(123)
+text_bush %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("firebrick4", "firebrick2"), 
+                   max.words = 40, title.size = 1.5)
+title(main = "Bush")
+
+# ------------------------------------------------------------------------------ Trump
+set.seed(12)
+text_trump %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("firebrick4", "firebrick2"), 
+                   max.words = 40, title.size = 1.5)
+title(main = "Trump")
+
+par(mfrow = c(1,2), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# ------------------------------------------------------------------------------ Obama
+set.seed(12)
+text_obama %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("dodgerblue4", "deepskyblue"), 
+                   max.words = 40, title.size = 1.5)
+title(main = "Obama")
+
+
+# ------------------------------------------------------------------------------ Biden
+set.seed(12)
+text_biden %>%
+  inner_join(NRC) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("dodgerblue4", "deepskyblue"), 
+                   max.words = 40, title.size = 1.5)
+title(main = "Biden")
+```
+
+## 7 Bigramas
+
+A continuación se realiza el análisis por parejas de palabras, esto para profundizar en la intención del discurso e identificar palabras compuestas.
+
+```{r}
+text_bush_bi <- text_bush_st %>%
+  unnest_tokens(tbl = ., input = text, output = bigram, token = "ngrams", n = 2) %>%
+  filter(!is.na(bigram))
+
+text_obama_bi <- text_obama_st %>%
+  unnest_tokens(tbl = ., input = text, output = bigram, token = "ngrams", n = 2) %>%
+  filter(!is.na(bigram))
+
+text_trump_bi <- text_trump_st %>%
+  unnest_tokens(tbl = ., input = text, output = bigram, token = "ngrams", n = 2) %>%
+  filter(!is.na(bigram))
+
+text_biden_bi <- text_biden_st %>%
+  unnest_tokens(tbl = ., input = text, output = bigram, token = "ngrams", n = 2) %>%
+  filter(!is.na(bigram))
+
+data.frame("Presidente"=c("Bush", "Obama", "Trump", "Biden"), "Num_tokens"=c(dim(text_bush_bi)[1], dim(text_obama_bi)[1], dim(text_trump_bi)[1], dim(text_biden_bi)[1]))
+```
+
+```{r}
+cbind(
+head(text_bush_bi, n = 10) %>% rename(line_Bush=line, bigram_Bush=bigram),
+head(text_obama_bi, n = 10) %>% rename(line_Obama=line, bigram_Obama=bigram),
+head(text_trump_bi, n = 10) %>% rename(line_Trump=line, bigram_Trump=bigram),
+head(text_biden_bi, n = 10) %>% rename(line_Biden=line, bigram_Biden=bigram)
+)
+```
+
+```{r}
+
+cbind(text_bush_bi %>%
+  count(bigram, sort = TRUE) %>%
+  head(n = 10) %>%
+  rename(bigram_Bush=bigram, n_Bush=n),
+
+text_obama_bi %>%
+  count(bigram, sort = TRUE) %>%
+  head(n = 10) %>%
+  rename(bigram_Obama=bigram, n_Obama=n),
+
+text_trump_bi %>%
+  count(bigram, sort = TRUE) %>%
+  head(n = 10) %>%
+  rename(bigram_Trump=bigram, n_Trump=n),
+
+text_biden_bi %>%
+  count(bigram, sort = TRUE) %>%
+  head(n = 10) %>%
+  rename(bigram_Biden=bigram, n_Biden=n))
+```
+
+Se normalizan los tokens de cada bigrama
+
+```{r}
+##### Normalización
+
+#--------------------------------------------------------------------------------------------- Bush
+text_bush_bi %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%        # se elmininan los números
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                 # se eliminan las stop words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>%                               # se eliminan tokens NA
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%                    # conteo por bigramas
+  rename(weight = n) -> text_bush_bi_counts
+
+
+#--------------------------------------------------------------------------------------------- Obama
+text_obama_bi %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%        # se elmininan los números
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                 # se eliminan las stop words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>%                               # se eliminan tokens NA
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%                    # conteo por bigramas
+  rename(weight = n) -> text_obama_bi_counts
+
+#--------------------------------------------------------------------------------------------- Trump
+text_trump_bi %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%        # se elmininan los números
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                 # se eliminan las stop words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>%                               # se eliminan tokens NA
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%                    # conteo por bigramas
+  rename(weight = n) -> text_trump_bi_counts
+
+#--------------------------------------------------------------------------------------------- Biden
+text_biden_bi %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%        # se elmininan los números
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                 # se eliminan las stop words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>%                               # se eliminan tokens NA
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%                    # conteo por bigramas
+  rename(weight = n) -> text_biden_bi_counts
+
+
+```
+
+```{r}
+#--------------------------------------------------------------------------- Republicanos
+cbind(head(text_bush_bi_counts, n = 20) %>% rename(word1_Bush=word1, word2_Bush=word2, weight_Bush=weight),
+      head(text_trump_bi_counts, n = 20) %>% rename(word1_Trump=word1, word2_Trump=word2, weight_Trump=weight))
+```
+```{r}
+#--------------------------------------------------------------------------- Demócratas
+cbind(head(text_obama_bi_counts, n = 20) %>% rename(word1_Obama=word1, word2_Obama=word2, weight_Obama=weight),
+      head(text_biden_bi_counts, n = 20) %>% rename(word1_Biden=word1, word2_Biden=word2, weight_Biden=weight))
+```
+
+### 7.1 Grafos
+
+```{r}
+#---------------------------------------------------------------------------------- Bush
+# grafo con umbral=2
+g_bush1 <- text_bush_bi_counts %>%
+  filter(weight > 1) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo con umbral=1
+g_bush0 <- text_bush_bi_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo inducido por la componente conexa más grande
+V(g_bush0)$cluster <- clusters(graph = g_bush0)$membership
+Compg_bush <- induced_subgraph(graph = g_bush0, vids = which(V(g_bush0)$cluster == which.max(clusters(graph = g_bush0)$csize)))
+
+# Grafos
+par(mfrow=c(1,2))
+
+set.seed(1234)
+plot(g_bush1, layout = layout_with_fr, vertex.color = "firebrick2", vertex.frame.color = "firebrick2", vertex.size = 3, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Bush\n umbral = 2")
+
+set.seed(123)
+plot(g_bush0, layout = layout_with_fr, vertex.color = "firebrick2", vertex.frame.color = "firebrick2", vertex.size = 3, vertex.label = NA, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Bush\n umbral = 1")
+
+# componente gigante
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo, grosor de aristas según la proporción del peso de la misma  
+
+#vector de labels para vertices con fuerza mayor que 3
+nombres<-ifelse(strength(Compg_bush)>3, names(strength(Compg_bush)), NA)
+
+set.seed(1234)
+plot(Compg_bush, layout = layout_with_kk, vertex.color = adjustcolor("firebrick2", 0.1), vertex.frame.color = "firebrick2", vertex.size = 2*strength(Compg_bush), vertex.label=nombres, vertex.label.color = 'black', vertex.label.cex = 0.6, vertex.label.dist = 1, edge.width = 3*E(g_bush0)$weight/max(E(g_bush0)$weight))
+title(main = "Componente conexa - Bigrama Bush", outer = T, line = -1)
+```
+En el grafo de umbral=2 se observan las conexiones entre las palabras con frecuencia mayor o igual a dos, teniendo en cuenta esto, se tienen una mejor idea de los temas principales del discurso, por lo tanto, en el discurso de Bush propondría un progreso enfatizando en la seguridad y libertad de los habitantes estadounidenses. Continuando, al ver la componente gigante del grafo de umbral=1, se evidencia como Bush trata de cierta manera el ideal norteamericano sobre la libertad, esto debido a la relación entre palabras con una fuerza significativa, como lo son american, freedom, liberty y citizens. Además de como Estados Unidos afrontaría el nuevo siglo.
+
+```{r}
+#---------------------------------------------------------------------------------- Obama
+# grafo con umbral=2
+g_obama1 <- text_obama_bi_counts %>%
+  filter(weight > 1) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo con umbral=1
+g_obama0 <- text_obama_bi_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo inducido por la componente conexa más grande
+V(g_obama0)$cluster <- clusters(graph = g_obama0)$membership
+Compg_obama <- induced_subgraph(graph = g_obama0, vids = which(V(g_obama0)$cluster == which.max(clusters(graph = g_obama0)$csize)))
+
+# Grafos
+par(mfrow=c(1,2))
+
+set.seed(34)
+plot(g_obama1, layout = layout_with_fr, vertex.color = "dodgerblue4", vertex.frame.color = "dodgerblue4", vertex.size = 3, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Obama\n umbral = 2")
+
+set.seed(123)
+plot(g_obama0, layout = layout_with_fr, vertex.color = "dodgerblue4", vertex.frame.color = "dodgerblue4", vertex.size = 3, vertex.label = NA, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Obama\n umbral = 1")
+
+# componente gigante
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+
+
+# tamaño de vertices según la fuerza del mismo, grosor de aristas según la proporción del peso de la misma  
+set.seed(123)
+plot(Compg_obama, layout = layout_with_kk, vertex.color = adjustcolor("dodgerblue4", 0.1), vertex.frame.color = "dodgerblue4", vertex.size = 2*strength(Compg_obama), vertex.label.color = 'black', vertex.label.cex = 0.6, vertex.label.dist = 1, edge.width = 3*E(g_obama0)$weight/max(E(g_obama0)$weight))
+title(main = "Componente conexa - Bigrama Obama", outer = T, line = -1)
+```
+En el discurso de Obama, al centrarnos en el grafo de umbral=2, se puede inferir que Obama habla de como las nuevas generaciones son las encargadas de continuar manteniendo la prosperidad de Estados Unidos, para que sea una nación donde haya igualdad, libertad y bienestar. En cuanto a la componente gigante del grafo de umbral=1, se evidencia por medio de el peso de las aristas temas importantes tales como que las generaciones futuras deberán afrontar las consecuencias presentes, protegiendo los intereses comunes y las libertades individuales y de como las acciones colectivas ayudan al crecimiento del país, además posiblemente habla de la tolerancia que debe haber entre los diferentes credos. 
+
+```{r}
+#---------------------------------------------------------------------------------- Trump
+# grafo con umbral=2
+g_trump1 <- text_trump_bi_counts %>%
+  filter(weight > 1) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo con umbral=1
+g_trump0 <- text_trump_bi_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo inducido por la componente conexa más grande
+V(g_trump0)$cluster <- clusters(graph = g_trump0)$membership
+Compg_trump <- induced_subgraph(graph = g_trump0, vids = which(V(g_trump0)$cluster == which.max(clusters(graph = g_trump0)$csize)))
+
+#### Grafos
+par(mfrow=c(1,2))
+
+set.seed(1234)
+plot(g_trump1, layout = layout_with_fr, vertex.color = "firebrick2", vertex.frame.color = "firebrick2", vertex.size = 3, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Trump\n umbral = 2")
+
+set.seed(123)
+plot(g_trump0, layout = layout_with_fr, vertex.color = "firebrick2", vertex.frame.color = "firebrick2", vertex.size = 3, vertex.label = NA, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Trump\n umbral = 1")
+
+# componente gigante
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo, grosor de aristas según la proporción del peso de la misma  
+set.seed(123)
+plot(Compg_trump, layout = layout_with_kk, vertex.color = adjustcolor("firebrick2", 0.1), vertex.frame.color = "firebrick2", vertex.size = 2*strength(Compg_trump), vertex.label.color = 'black', vertex.label.cex = 0.6, vertex.label.dist = 1, edge.width = 3*E(g_trump0)$weight/max(E(g_trump0)$weight))
+title(main = "Componente conexa - Bigrama Trump", outer = T, line = -1)
+```
+
+En el discurso de Trump, basados en el grafo de umbral=2, se puede llegar a pensar que el tema central es el avance de la nación por medio del trabajo de los estadounidenses, ahondando más en esto se analiza la componente gigante del grafo de umbral=1, la cual respalda lo anteriormente mencionado,esto se evidencia en el grafo al ver como la palabra american se encuentra frecuentemente relacionada, principalmente hablando de beneficios y temas del mundo laboral.
+
+
+```{r}
+#---------------------------------------------------------------------------------- Biden
+# grafo con umbral=2
+g_biden1 <- text_biden_bi_counts %>%
+  filter(weight > 1) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo con umbral=1
+g_biden0 <- text_biden_bi_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+# grafo inducido por la componente conexa más grande
+V(g_biden0)$cluster <- clusters(graph = g_biden0)$membership
+Compg_biden <- induced_subgraph(graph = g_biden0, vids = which(V(g_biden0)$cluster == which.max(clusters(graph = g_biden0)$csize)))
+
+# Grafos
+par(mfrow=c(1,2))
+
+set.seed(1234)
+plot(g_biden1, layout = layout_with_fr, vertex.color = "dodgerblue4", vertex.frame.color = "dodgerblue4", vertex.size = 3, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Biden \n umbral = 2")
+
+set.seed(123)
+plot(g_biden0, layout = layout_with_fr, vertex.color = "dodgerblue4", vertex.frame.color = "dodgerblue4", vertex.size = 3, vertex.label = NA, vertex.label.color = 'black', vertex.label.cex = 1, vertex.label.dist = 1, main = "Biden\n umbral = 1")
+
+# componente gigante
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo, grosor de aristas según la proporción del peso de la misma  
+set.seed(123)
+plot(Compg_biden, layout = layout_with_kk, vertex.color = adjustcolor("dodgerblue4", 0.1), vertex.frame.color = "dodgerblue4", vertex.size = 2*strength(Compg_biden), vertex.label.color = 'black', vertex.label.cex = 0.6, vertex.label.dist = 1, edge.width = 3*E(g_biden0)$weight/max(E(g_biden0)$weight))
+title(main = "Componente conexa - Bigrama Biden", outer = T, line = -1)
+```
+Teniendo un poco más presente el contexto socio-politico bajo el cual Biden fue electo, se evidencia en su discurso la justicia racial, además de distintos problemas bélicos al rededor del mundo. En cuanto a la componente gigante del grafo de umbral=1, se observan principalmente nombres de su gabinete, los cuales se asumen como posibles figuras importantes de su gobierno. 
+
+## 8 Skip-gramas
+
+```{r}
+text_bush_skip <- text_bush_st %>%
+  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
+  filter(!is.na(skipgram))
+
+text_obama_skip <- text_obama_st %>%
+  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
+  filter(!is.na(skipgram))
+
+text_trump_skip <- text_trump_st %>%
+  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
+  filter(!is.na(skipgram))
+
+text_biden_skip <- text_biden_st %>%
+  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
+  filter(!is.na(skipgram))
+
+dim(text_bush_skip)
+dim(text_obama_skip)
+dim(text_trump_skip)
+dim(text_biden_skip)
+```
+
+Se remueven los unigramas del análisis
+```{r}
+#----------------------------------------------------------------------------- Bush
+# contar palabras en cada skip-gram
+text_bush_skip$num_words <- text_bush_skip$skipgram %>% 
+  map_int(.f = ~ wordcount(.x))
+
+head(text_bush_skip, n = 10)
+
+# remover unigramas
+text_bush_skip %<>% 
+  filter(num_words == 2) %>% 
+  select(-num_words)
+
+dim(text_bush_skip)
+```
+
+```{r}
+#----------------------------------------------------------------------------- Obama
+# contar palabras en cada skip-gram
+text_obama_skip$num_words <- text_obama_skip$skipgram %>% 
+  map_int(.f = ~ wordcount(.x))
+
+head(text_obama_skip, n = 10)
+
+# remover unigramas
+text_obama_skip %<>% 
+  filter(num_words == 2) %>% 
+  select(-num_words)
+
+dim(text_obama_skip)
+```
+
+```{r}
+#----------------------------------------------------------------------------------------- Trump
+# contar palabras en cada skip-gram
+text_trump_skip$num_words <- text_trump_skip$skipgram %>% 
+  map_int(.f = ~ wordcount(.x))
+
+head(text_trump_skip, n = 10)
+
+# remover unigramas
+text_trump_skip %<>% 
+  filter(num_words == 2) %>% 
+  select(-num_words)
+
+dim(text_trump_skip)
+```
+
+
+```{r}
+#----------------------------------------------------------------------------------------- Biden
+# contar palabras en cada skip-gram
+text_biden_skip$num_words <- text_biden_skip$skipgram %>% 
+  map_int(.f = ~ wordcount(.x))
+
+head(text_biden_skip, n = 10)
+
+# remover unigramas
+text_biden_skip %<>% 
+  filter(num_words == 2) %>% 
+  select(-num_words)
+
+dim(text_biden_skip)
+```
+
+Como se realizó anteriormente se normalizan los tokens 
+```{r}
+#----------------------------------------------------------------------------------------- Bush
+text_bush_skip %>%
+  separate(skipgram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%          # se eliminan los números  
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                   # se eliminan las stop_words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>% 
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%
+  rename(weight = n) -> text_bush_skip_counts              # el peso de cada pareja de palabras (bigrama) es su frecuencia
+
+#----------------------------------------------------------------------------------------- Obama
+text_obama_skip %>%
+  separate(skipgram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%          # se eliminan los números  
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                   # se eliminan las stop_words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>% 
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%
+  rename(weight = n) -> text_obama_skip_counts              # el peso de cada pareja de palabras (bigrama) es su frecuencia
+
+#---------------------------------------------------------------------------------------- Trump
+text_trump_skip %>%
+  separate(skipgram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%          # se eliminan los números  
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                   # se eliminan las stop_words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>% 
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%
+  rename(weight = n) -> text_trump_skip_counts              # el peso de cada pareja de palabras (bigrama) es su frecuencia
+
+
+#---------------------------------------------------------------------------------------- Biden
+text_biden_skip %>%
+  separate(skipgram, c("word1", "word2"), sep = " ") %>%
+  filter(!grepl(pattern = '[0-9]', x = word1)) %>%          # se eliminan los números  
+  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
+  filter(!word1 %in% stop_words$word) %>%                   # se eliminan las stop_words
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!is.na(word1)) %>% 
+  filter(!is.na(word2)) %>%
+  count(word1, word2, sort = TRUE) %>%
+  rename(weight = n) -> text_biden_skip_counts              # el peso de cada pareja de palabras (bigrama) es su frecuencia
+
+dim(text_bush_skip_counts)
+dim(text_obama_skip_counts)
+dim(text_trump_skip_counts)
+dim(text_biden_skip_counts)
+```
+
+```{r}
+head(text_bush_skip_counts, n = 10)
+```
+
+```{r}
+head(text_obama_skip_counts, n = 10)
+```
+
+```{r}
+head(text_trump_skip_counts, n = 10)
+```
+
+```{r}
+head(text_biden_skip_counts, n = 10)
+```
+
+### 8.1 Grafos
+
+```{r}
+#---------------------------------------------------------------------------------------- Bush
+##### definir una red a partir de la frecuencia (weight) de los bigramas
+g_bush_sk <- text_bush_skip_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+g_bush_sk <- igraph::simplify(g_bush_sk)  
+
+# grafo inducido por la componente conexa
+V(g_bush_sk)$cluster <- clusters(graph = g_bush_sk)$membership
+Compg_bush_sk <- induced_subgraph(graph = g_bush_sk, vids = which(V(g_bush_sk)$cluster == which.max(clusters(graph = g_bush_sk)$csize)))
+
+### Grafos
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo
+set.seed(123)
+plot(Compg_bush_sk, layout = layout_with_fr, vertex.color = adjustcolor("firebrick2", 0.1), vertex.frame.color = "firebrick2", vertex.size = 2*strength(Compg_bush_sk), vertex.label = NA)
+title(main = "Componente conexa - Skip-grama Bush", outer = T, line = -1)
+```
+
+
+```{r}
+#---------------------------------------------------------------------------------------- Obama
+##### definir una red a partir de la frecuencia (weight) de los bigramas
+g_obama_sk <- text_obama_skip_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+g_obama_sk <- igraph::simplify(g_obama_sk)  
+
+# grafo inducido por la componente conexa
+V(g_obama_sk)$cluster <- clusters(graph = g_obama_sk)$membership
+Compg_obama_sk <- induced_subgraph(graph = g_obama_sk, vids = which(V(g_obama_sk)$cluster == which.max(clusters(graph = g_obama_sk)$csize)))
+
+### Grafos
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo
+set.seed(123)
+plot(Compg_obama_sk, layout = layout_with_fr, vertex.color = adjustcolor("dodgerblue4", 0.1), vertex.frame.color = "dodgerblue4", vertex.size = 2*strength(Compg_obama_sk), vertex.label = NA)
+title(main = "Componente conexa - Skip-grama Obama", outer = T, line = -1)
+```
+
+```{r}
+#---------------------------------------------------------------------------------------- Trump
+##### definir una red a partir de la frecuencia (weight) de los bigramas
+g_trump_sk <- text_trump_skip_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+g_trump_sk <- igraph::simplify(g_trump_sk)  
+
+# grafo inducido por la componente conexa
+V(g_trump_sk)$cluster <- clusters(graph = g_trump_sk)$membership
+Compg_trump_sk <- induced_subgraph(graph = g_trump_sk, vids = which(V(g_trump_sk)$cluster == which.max(clusters(graph = g_trump_sk)$csize)))
+
+### Grafos
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo
+set.seed(123)
+plot(Compg_trump_sk, layout = layout_with_fr, vertex.color = adjustcolor("firebrick2", 0.1), vertex.frame.color = "firebrick2", vertex.size = 2*strength(Compg_trump_sk), vertex.label = NA)
+title(main = "Componente conexa - Skip-grama Trump", outer = T, line = -1)
+```
+
+```{r}
+#---------------------------------------------------------------------------------------- Biden
+##### definir una red a partir de la frecuencia (weight) de los bigramas
+g_biden_sk <- text_biden_skip_counts %>%
+  filter(weight > 0) %>%
+  graph_from_data_frame(directed = FALSE)
+
+g_biden_sk <- igraph::simplify(g_biden_sk)  
+
+# grafo inducido por la componente conexa
+V(g_biden_sk)$cluster <- clusters(graph = g_biden_sk)$membership
+Compg_biden_sk <- induced_subgraph(graph = g_biden_sk, vids = which(V(g_biden_sk)$cluster == which.max(clusters(graph = g_biden_sk)$csize)))
+
+### Grafos
+par(mfrow = c(1,1), mar = c(1,1,2,1), mgp = c(1,1,1))
+
+# tamaño de vertices según la fuerza del mismo
+set.seed(123)
+plot(Compg_biden_sk, layout = layout_with_fr, vertex.color = adjustcolor("dodgerblue4", 0.1), vertex.frame.color = "dodgerblue4", vertex.size = 2*strength(Compg_biden_sk), vertex.label = NA)
+title(main = "Componente conexa - Skip-grama Biden", outer = T, line = -1)
+```
+
+Debido a que los anteriores grafos presentan mayor tamaño y complejidad en su visualización, se analizarán sus estadisticas estructurales y su partición por temáticas a continuación.
+
+## 9 Comparación entre discursos
+
+### 9.1 Estadísticas estructurales
+
+```{r}
+estad <- function(grafo, presi){
+  dist_geo <- mean_distance(graph = grafo, directed = FALSE)
+  grado_prom <- mean(degree(graph = grafo))
+  sd_grado <- sd(degree(graph = grafo))
+  num_clan <- length(largest.cliques(graph = g_obama_sk)[[1]])
+  densidad <- edge_density(grafo)
+  asortatividad <- assortativity_degree(graph = grafo, directed= F)
+  datos <- rbind(dist_geo, grado_prom, sd_grado, num_clan, densidad, asortatividad)
+  colnames(datos) <- presi
+  return(data.frame(round(datos, 3)))
+}
+
+
+cbind(estad(Compg_bush_sk, "Bush"),estad(Compg_obama_sk, "Obama"), estad(Compg_trump_sk, "Trump"), estad(Compg_biden_sk, "Biden"))
+```
+
+Se observa que el grado promedio de la componente gigante para los grafos asociados a los discursos creados mediante los skip-grams, está alrededor de $2.5$ para los cuatro discursos, aunque sus desviaciones estándar difieren un poco más, por lo que en el discurso de Bush hay mayor heterogeneidad entre los grados de las palabras, mientras que en el discurso de Obama al tener la menor desviación estandas es el que presenta más homogeneidad en los grados. En cuanto al número clan se evidencia que es el mismo para todos los discursos, por lo tanto, el número maximo de palabras totalmente conectadas entre sí, es de 3. Por otro lado, al ver la densidad y la distancia geodésica se observa que los grafos asosciados a los discursos de Trump y Biden son los de mayor densidad, lo cual puede ser causado a que ellos cuentan con un solo discurso, por lo tanto, menos cantidad de palabras que en los discursos de Bush y Obama; por esta razón es posible que se presenten mayor numero de aristas en los discursos de Bush y Obama, lo cual puede generar la disminución en la distancia geodesica. Para finalizar, debido al coeficiente de asortatividad cercano a 0 de todos los grafos asociados a los discrusos presidenciales, la relación entre palabras no sigue un patrón y podría ser considerada aleatoria.
+
+### 9.2 Top 10 de los grafos
+
+```{r}
+top <- function(grafo){
+  vec <- eigen_centrality(graph = grafo, scale = T)$vector
+  vec_ord <- sort(vec, decreasing = T)
+  eig_ord <- data.frame("word"=names(vec_ord), "eig"=vec_ord)
+  rownames(eig_ord) <- NULL
+  return(eig_ord)
+}
+
+top(Compg_bush_sk)[1:10,]
+top(Compg_obama_sk)[1:10,]
+top(Compg_trump_sk)[1:10,]
+top(Compg_biden_sk)[1:10,]
+```
+
+### 9.3 Agrupamiento 
+
+```{r}
+Agrupamiento <- function(grafo, presi, col_osc, col_cl){
+  lista <- NULL
+  
+  # partición del grafo
+  lista[[1]] <- agrup <- cluster_fast_greedy(grafo)
+  
+  # se asigna un color diferente a los vertices del grupo más grande
+  V(grafo)$color <- ifelse(agrup$membership==order(sizes(agrup), decreasing = T)[1], col_osc, col_cl)
+  
+  # Grafo
+  set.seed(123)
+  lista[[2]] <-plot(grafo, layout = layout_with_fr, vertex.color = adjustcolor(V(grafo)$color, 0.1), vertex.frame.color = V(grafo)$color, vertex.size = 2*strength(grafo), vertex.label = NA, main = paste0("Partición componente conexa\n Skip-grama ", presi))
+  
+  return(lista)
+}
+
+Agrup_bush <-Agrupamiento(Compg_bush_sk, "Bush", "red4", "red")
+Agrup_obama <-Agrupamiento(Compg_obama_sk, "Obama", "dodgerblue4", "deepskyblue")
+Agrup_trump <-Agrupamiento(Compg_trump_sk, "Trump", "red4", "red")
+Agrup_biden <-Agrupamiento(Compg_biden_sk, "Biden", "dodgerblue4", "deepskyblue")
+```
+Debido a que los anteriores grafos presentan gran tamaño y complejidad en su visualización, se analizarán sus estadisticas de centralidad a continuación.
+
+
+```{r}
+med_agrup <- function(part, grafo, presi){
+  lista <- NULL
+  
+  # número de grupos
+  num_grup <- length(part)
+  
+  # tamaño grupo más grande
+  tam_grup_mayor <- sort(sizes(part), decreasing = T)[1]
+  
+  # tamaño grupo más pequeño
+  tam_grup_menor <- sort(sizes(part), decreasing = F)[1]
+  
+  lista[[1]] <- data.frame(rbind(num_grup, tam_grup_mayor, tam_grup_menor))
+  colnames(lista[[1]]) <- presi
+  
+  lista[[2]] <- top(grafo)%>%
+    inner_join(data.frame("word"=part$names, "grupo"=part$membership), by=c("word"="word"))%>%
+    arrange(desc(eig)) %>%
+    filter(grupo==order(sizes(part), decreasing = T)[1])
+  
+  return(lista)
+}
+
+MedAgrup_bush <- med_agrup(Agrup_bush[[1]], Compg_bush_sk, "Bush")
+MedAgrup_obama <- med_agrup(Agrup_obama[[1]], Compg_obama_sk, "Obama")
+MedAgrup_trump <- med_agrup(Agrup_trump[[1]], Compg_trump_sk, "Trump")
+MedAgrup_biden <- med_agrup(Agrup_biden[[1]], Compg_biden_sk, "Biden")
+
+cbind(MedAgrup_bush[[1]],MedAgrup_obama[[1]], MedAgrup_trump[[1]], MedAgrup_biden[[1]] )
+
+MedAgrup_bush[[2]][1:5,]
+MedAgrup_obama[[2]][1:5,]
+MedAgrup_trump[[2]][1:5,]
+MedAgrup_biden[[2]][1:5,]
+```
+
+Como se mencionó anteriormente, al ser los grafos de los discrsos de Bush y Obama generados por la unión de dos discursos, su número de grupos o de temáticas es mucho mayor a los grafos generados por los discursos de Trump y Biden. Posteriormente se analizan las palabras más importante en la temática principal de cada discurso.
+
+Para el discurso de Bush, se podría afirmar que el tema principal es un llamado a los estadounidenses a tener mejor cultura ciudadana.
+Para el discurso de Obama, se podría afirmar que el tema principal es mantener viva la grandeza y el poder norteamericano.
+Para el discurso de Trump, se podría afirmar que el tema principal va en corriente con su principal eslogan de campaña, el cual fue "make America great again".
+Finalmente para el discurso de Biden, se podría afirmar que el tema principal es proteger la democracia en Estados Unidos y sus bondades como lo son la esperanza y la verdad.
+
+
+
+
+
+
+
+
+
+
+
