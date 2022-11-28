@@ -1,0 +1,66 @@
+---
+title: "Taller 1 punto 6 - Redes sociales"
+author: "Ariadna Sofía Contreras Abril - Angie Villate"
+date: "31/8/2022"
+output: html_document
+---
+
+6. Escribir una rutina que reconstruya la matriz de aristas y una lista de vértices asilados (si los hay) a partir de la matriz de adyacencia. Probar esta rutina con una red no dirigida de 25 nodos simulada a partir de enlaces aleatorios independientes e idénticamente distribuidos con probabilidad de éxito 0.1. Graficar la red de prueba.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(igraph)
+library(dplyr)
+library(stringi)
+```
+
+Se construye la matriz de adyacencia con enlaces iid y probabilidad 0.1
+
+```{r}
+n=25
+a=(n*(n-1))/2
+
+adymatrix<-matrix(rep(0,25*25), 25 , 25)
+
+set.seed(123)
+triady<-rbinom(a,1,0.1)
+adymatrix[lower.tri(adymatrix, diag=FALSE)]<-triady
+
+adymatrix<-adymatrix+t(adymatrix)
+
+isSymmetric(adymatrix)
+
+```
+
+Luego la rutina para la construcción de la matriz de aristas 
+
+```{r}
+n <- dim(adymatrix)[1]
+A <- NULL
+for (i in 1:(n-1)) 
+  for (j in (i+1):n) 
+    if (adymatrix[i,j] == 1) 
+      A <- rbind(A, c(i,j))
+class(A)
+```
+
+Así mismo la rutina para encontrar aquellos vertices aislado es 
+
+```{r}
+va<-as.matrix(ifelse(colMeans(adymatrix)==0, yes = "Aislado", no="Enlazado"))
+
+B <- NULL
+for (i in 1:(n)) {
+   if (colMeans(adymatrix)[i] == 0) 
+       B <- rbind(B, i) }
+
+```
+
+La gráfica red de prueba se muestra a continuación
+
+```{r}
+grafop6 <- graph_from_adjacency_matrix(adjmatrix = adymatrix, mode = "undirected")
+set.seed(42)
+plot(grafop6, vertex.label.size = 1.2, vertex.size = 20, vertex.color = 2,layout = layout_with_fr)
+title(main = "Grafo punto 6")
+
+```

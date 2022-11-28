@@ -1,0 +1,117 @@
+---
+title: "Taller 2 - Redes sociales"
+author: "Ariadna Sofía Contreras Abril - Angie Catalina Villate Nuñez"
+date: "31/8/2022"
+output: html_document
+---
+7. Considere los datos relacionales acerca de los conflictos internacionales del archivo conflict.RData habiendo removido los nodos aislados:
+
+```{r}
+# datos
+load("conflict.RData")
+Y <- dat$Y
+
+# remover nodos aislados
+Y <- 1*( Y*t(Y) > 0 )
+deg <- apply(X = Y, MARGIN = 1, FUN = sum, na.rm = TRUE)
+Y <- Y[deg > 0, deg > 0]
+```
+
+* Hacer una visualización de la red.
+
+```{r}
+library(igraph)
+# asegurarse que es una red no dirigida
+isSymmetric(Y)
+
+# matriz de aristas
+n <- dim(Y)[1]
+A <- NULL
+for (i in 1:(n-1)) {
+  for (j in (i+1):n) {
+    if (Y[i,j] == 1) {
+      A <- rbind(A, c(i,j))}
+  }
+}
+
+#construcción del grafo
+g <- graph_from_data_frame(d = A, directed = "F")
+V(g)$label.dist <- 1.5
+set.seed(13)
+plot(g,vertex.color = 2, vertex.size = 8, vertex.label.size=3)
+```
+
+
+* Identificar las componentes conectadas del grafo.
+
+```{r}
+# el grafo no es conectado
+is_connected(g)
+
+clusters(g)
+```
+
+* Identificar la componente gigante del grafo.
+
+```{r}
+which(clusters(g)$csize==max(clusters(g)$csize))
+```
+
+* Calcular la matriz de distancias geodésicas de la componente gigante del grafo e incrustar estas distancias en un espacio de dos dimensiones por medio de escalamiento multidimensional (cmdscale en R).
+
+```{r}
+# nodos que pertenecen al componente gigante (1)
+comp1<-which(clusters(g)$membership==1)
+
+# matriz de distancias geodésicas
+DG<-distances(graph = g, v = V(g)[comp1], to = V(g)[comp1])
+
+# escalamiento multidimensional
+cmdscale(DG, k=2)
+```
+
+8. Conseguir una base de datos relacionales de su interés de cualquier área de estudio.
+
+* ¿De qué se trata la red? ¿A qué corresponden los vértices? ¿Las aristas?
+  
+La red describe la relación entre las paginas web de las agencias gubernamentales de Estados Unidos enlazadas mediante hiperlinks, los cuales llevan de una página web a otra, en este caso unicamente se considerará el estado de Nueva York. Los nodos representan las paginas web de toda una agencia y sus relaciones dirigidas representan la existencia de un hiperlink.
+
+
+* ¿Por qué es interesante estudiar esta red? ¿Qué preguntas se quieren responder?
+
+El interés por estudiar esta red surge a partir de ver la accesibilidad entre las páginas de las agencias, al ser Estados Unidos un país desarrollado, es importante el análisis de la buena implementación de su sistema web el cual se espera sea intuitivo y de fácil manejo para todo público. Debido a la gran cantidad de entidades gubernamentales se busca diferenciar que grupos pueden identificarse a través de estas relaciones de modo que aquellas entidades con propósitos similares de ser posible sean representadas como una sola, además de encontrar que páginas web tienen el mayor número de redireccionamiento a otras.
+
+
+* Hacer una visualización tanto simple como decorada de la red.
+
+```{r}
+library(readr)
+edges <- read_delim("edges.txt", 
+                    delim = "\t", escape_double = FALSE, 
+                    trim_ws = TRUE)
+nodes <- read_delim("nodes.txt", 
+                    delim = "\t", escape_double = FALSE, 
+                    trim_ws = TRUE)
+```
+A continuación se usa la matriz de aristas para crear el grafo y su posterior visualización.
+
+
+```{r}
+library(igraph)
+usagency<-graph_from_data_frame(edges[,c(1,2)], directed = TRUE)
+E(usagency)$weight = sqrt(edges$RelLinkCount) 
+
+drl<-layout_with_drl(usagency)
+kk<-layout_with_kk(usagency) 
+fr<-layout_with_fr(usagency)
+
+#simple  
+plot(usagency, vertex.label = NA, vertex.color = 2, vertex.size=10, edge.arrow.size=0.5)
+
+#decorado
+E(usagency)$width<-E(usagency)$weight
+V(usagency)$size<-4*sqrt(strength(usagency))
+plot(usagency, vertex.label = NA, vertex.color = "darkolivegreen3", layout = drl, edge.arrow.size=0.5, edge.color="darkslategray4")
+
+plot(usagency, vertex.label = NA, vertex.color = "darkolivegreen3", layout = kk, edge.arrow.size=0.5, edge.color="darkslategray")
+```
